@@ -1,41 +1,31 @@
 import streamlit as st
 import pandas as pd
-import random
+import numpy as np
 import io
 
-# User inputs
-start = st.number_input("Enter start number (inclusive)", value=1000)
-end = st.number_input("Enter end number (exclusive)", value=8000)
-total_numbers = st.number_input("Enter how many random numbers you want", value=540)
-columns = st.number_input("Enter number of columns in the output", value=20)
+st.title("🎲 Sorted Random Number Generator")
 
-if st.button("Generate Table"):
-    if end - start < total_numbers:
+start_num = st.number_input("From which number?", value=1000)
+end_num = st.number_input("Till what number?", value=8000)
+num_columns = st.number_input("How many columns?", value=20)
+num_random = st.number_input("How many numbers to generate?", value=540)
+
+if st.button("Generate"):
+    if end_num - start_num < num_random:
         st.error("Range is too small for the number of unique values requested.")
     else:
-        numbers = random.sample(range(start, end), int(total_numbers))
-        
-        # Sort and reshape numbers column-wise
-        numbers.sort()
-        rows = (total_numbers + columns - 1) // columns
-        padded = numbers + [""] * (rows * columns - len(numbers))
-        matrix = [padded[i::rows] for i in range(rows)]
-        df = pd.DataFrame(matrix).transpose()
-        df.index += 1  # 1-based indexing
-        df.columns = [str(i + 1) for i in range(df.shape[1])]
+        random_numbers = np.random.choice(range(start_num, end_num), int(num_random), replace=False)
+        random_numbers.sort()
 
+        num_rows = -(-num_random // num_columns)  # ceiling division
+        padded = np.append(random_numbers, [np.nan] * (num_rows * num_columns - num_random))
+        reshaped = padded.reshape((int(num_columns), num_rows)).T
+
+        df = pd.DataFrame(reshaped, columns=[f"{i+1}" for i in range(int(num_columns))])
         st.dataframe(df)
 
-        # Save to Excel in-memory
+        # Downloadable Excel
         output = io.BytesIO()
         with pd.ExcelWriter(output, engine='openpyxl') as writer:
             df.to_excel(writer, index=False)
-        output.seek(0)
-
-        # Download button
-        st.download_button(
-            label="📥 Download Excel File",
-            data=output,
-            file_name="sorted_random_table.xlsx",
-            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-        )
+        st.download_button("📥 Download Excel File", output.getvalue(), file_name="sorted_columnwise_output.xlsx")
