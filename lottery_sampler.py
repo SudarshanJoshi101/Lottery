@@ -1,35 +1,41 @@
 import streamlit as st
 import pandas as pd
-import numpy as np
 import random
+import io
 
-st.title("🎲 Random Number Table Generator")
-
-# Input widgets
-start_num = st.number_input("From which number (inclusive)", value=1000, step=1)
-end_num = st.number_input("Till what number (exclusive)", value=8000, step=1)
-num_columns = st.number_input("Number of columns in output", value=20, step=1)
-total_numbers = st.number_input("Total random numbers to generate", value=540, step=1)
+# User inputs
+start = st.number_input("Enter start number (inclusive)", value=1000)
+end = st.number_input("Enter end number (exclusive)", value=8000)
+total_numbers = st.number_input("Enter how many random numbers you want", value=540)
+columns = st.number_input("Enter number of columns in the output", value=20)
 
 if st.button("Generate Table"):
-    if end_num - start_num < total_numbers:
-        st.error("Range too small for the number of unique values requested.")
+    if end - start < total_numbers:
+        st.error("Range is too small for the number of unique values requested.")
     else:
-        # Step 1: Generate sorted random numbers
-        random_numbers = sorted(random.sample(range(start_num, end_num), total_numbers))
+        numbers = random.sample(range(start, end), int(total_numbers))
+        
+        # Sort and reshape numbers column-wise
+        numbers.sort()
+        rows = (total_numbers + columns - 1) // columns
+        padded = numbers + [""] * (rows * columns - len(numbers))
+        matrix = [padded[i::rows] for i in range(rows)]
+        df = pd.DataFrame(matrix).transpose()
+        df.index += 1  # 1-based indexing
+        df.columns = [str(i + 1) for i in range(df.shape[1])]
 
-        # Step 2: Pad to fill complete table
-        rows = (total_numbers + num_columns - 1) // num_columns
-        random_numbers += [None] * (rows * num_columns - total_numbers)
-
-        # Step 3: Arrange column-wise
-        array = np.array(random_numbers).reshape((rows, num_columns), order='F')
-        df = pd.DataFrame(array)
-
-        # Step 4: Set column names to 1-based index
-        df.columns = [str(i) for i in range(1, num_columns + 1)]
-
-        # Step 5: Download option
         st.dataframe(df)
-        st.download_button("📥 Download Excel File", df.to_excel(index=False, engine='openpyxl'), file_name="sorted_random_table.xlsx")
 
+        # Save to Excel in-memory
+        output = io.BytesIO()
+        with pd.ExcelWriter(output, engine='openpyxl') as writer:
+            df.to_excel(writer, index=False)
+        output.seek(0)
+
+        # Download button
+        st.download_button(
+            label="📥 Download Excel File",
+            data=output,
+            file_name="sorted_random_table.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        )
